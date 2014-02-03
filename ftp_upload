@@ -1,0 +1,108 @@
+#!/usr/bin/expect
+global directory_list
+
+# set infinite timeout because these transfers take forever.
+set timeout -1
+
+# Read the tcl file that contains password and site info
+source [file join [file dirname [info script]] ftp_pass.tcl]
+
+# spawn new FTP session
+spawn $cmd
+
+# deal with the login process
+expect "Name*: "
+send $usr
+expect "Password: "
+send $passwd
+
+# next is the FTP prompt
+expect "ftp> "
+
+send "cd public_html\r"
+
+# change to th png directory on the server
+send "cd png\r"
+#send "cd test\r"
+
+# find the directories on the server
+send "ls -1\r"
+expect "..*"
+set list $expect_out(0,string)
+
+# find the directories on the local machine
+foreach file [glob *] {
+   # check if the file is a directory
+   if {[file isdirectory $file]} {
+      # append this directory to the filelist
+      lappend dir_list [string trimright $file]
+   }
+
+   # now check if the directory exists on the remote machine
+   if {[lsearch $list [string trimright $file]] == -1} {
+      set newfilename [string trimright $file]
+send_user $newfilename
+      send "mkdir $newfilename\r"
+      expect "ftp> "
+   }
+}
+
+send_user $dir_list
+
+# set to interact for debugging
+#interact "X" return
+
+expect "ftp> "
+# expect the prompt and then exit
+send "quit\n"
+
+# NEXT we have to get the actual files in those directories
+# spawn new FTP session
+spawn ftp -iV iblipped.com
+
+# deal with the login process
+expect "Name*: "
+send $usr
+expect "Password: "
+send $passwd
+
+# next is the FTP prompt
+expect "ftp> "
+
+send "cd public_html\r"
+expect "ftp> "
+
+# change to th png directory on the server
+send "cd png\r"
+#send "cd test\r"
+expect "ftp> "
+
+# loop through each directory
+foreach dirname $dir_list {
+   # switch on the regular expression for regular named files
+   # this eliminates "." ".." and blank lines returned
+   switch -regexp -- $dirname \
+   {[a-zA-Z0-9]} {
+      # send commands to change remote and local directories
+      send "cd $dirname\r"
+      expect "ftp> "
+      send "lcd $dirname\r"
+      expect "ftp> "
+
+      # get all png files in the directory
+      send "mput \*.png\r"
+      expect "ftp> "
+
+      # send commands to change remote and local directories
+      send "cd ..\r"
+      expect "ftp> "
+      send "lcd ..\r"
+      expect "ftp> "
+   }
+}
+
+# allow interaction if you want to debug
+#interact "X" return
+
+# expect the prompt and then exit
+send "quit\n"

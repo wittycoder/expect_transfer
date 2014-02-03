@@ -1,0 +1,16 @@
+#!/usr/bin/expect
+
+# Read the tcl file that contains password and site info
+source [file join [file dirname [info script]] ftp_pass.tcl]
+
+# old method of ftping to site spawn ftp -iV site.com
+spawn $cmd
+
+expect "Name"
+send $usr
+expect "Password"
+send $passwd
+
+expect "ftp> "
+
+interact -o eof
